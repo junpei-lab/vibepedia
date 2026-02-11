@@ -1,0 +1,58 @@
+---
+/* vibepedia おまかせ表示ページ
+ * ランダムな記事にリダイレクトするページ。
+ * 静的生成のため、クライアントサイドJSで実装する。
+ */
+import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+const base = import.meta.env.BASE_URL;
+const allArticles = await getCollection('articles');
+
+/* 全記事のスラッグ一覧をJSON形式で埋め込む */
+const slugs = allArticles.map((a) => a.data.slug ?? a.id);
+---
+
+<Layout title="おまかせ表示" description="ランダムに記事を表示します">
+  <div class="random-container">
+    <div class="random-spinner"></div>
+    <p class="random-text">ランダムに記事を選んでいます...</p>
+  </div>
+
+  <!-- クライアントサイドでランダムリダイレクトを実行 -->
+  <script define:vars={{ slugs, base }}>
+    const randomSlug = slugs[Math.floor(Math.random() * slugs.length)];
+    window.location.href = `${base}articles/${encodeURIComponent(randomSlug)}`;
+  </script>
+</Layout>
+
+<style>
+  .random-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-2xl) 0;
+    gap: var(--spacing-lg);
+  }
+
+  .random-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--color-border-light);
+    border-top-color: var(--color-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .random-text {
+    font-size: 0.9375rem;
+    color: var(--color-text-secondary);
+  }
+</style>

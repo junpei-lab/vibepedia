@@ -1,0 +1,136 @@
+---
+/* vibepedia メインレイアウト
+ * 全ページ共通のHTML構造を定義する。
+ * ヘッダー・サイドバー・メインコンテンツ・フッターの配置を管理。
+ */
+import Header from '../components/Header.astro';
+import Sidebar from '../components/Sidebar.astro';
+import Footer from '../components/Footer.astro';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+  ogType?: 'website' | 'article';
+  /* 記事ページ用: 目次の見出しデータ */
+  headings?: { depth: number; slug: string; text: string }[];
+  /* 記事ページかどうかのフラグ */
+  isArticle?: boolean;
+}
+
+const {
+  title = 'Vibepedia',
+  description = 'Vibepedia - フリー百科事典',
+  ogImage,
+  ogType,
+  headings = [],
+  isArticle = false,
+} = Astro.props;
+
+const pageTitle = title === 'Vibepedia' ? title : `${title} - Vibepedia`;
+const base = import.meta.env.BASE_URL;
+const canonicalUrl = Astro.site ? new URL(Astro.url.pathname, Astro.site).toString() : undefined;
+const resolvedOgType = ogType ?? (isArticle ? 'article' : 'website');
+const resolvedOgImage = Astro.site
+  ? new URL(ogImage ?? `${base}ogp-default.png`, Astro.site).toString()
+  : ogImage ?? `${base}ogp-default.png`;
+---
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+    <meta name="description" content={description} />
+    <meta property="og:site_name" content="Vibepedia" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content={resolvedOgType} />
+    {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+    <meta property="og:image" content={resolvedOgImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={resolvedOgImage} />
+    <meta name="generator" content={Astro.generator} />
+    <title>{pageTitle}</title>
+  </head>
+  <body>
+    <Header />
+    <div class="page-wrapper">
+      <Sidebar headings={headings} isArticle={isArticle} />
+      <main class="main-content" id="main-content">
+        <slot />
+      </main>
+    </div>
+    <Footer />
+
+    <!-- モバイルメニュー制御スクリプト -->
+    <script>
+      const toggle = document.getElementById('sidebar-toggle');
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+
+      function closeSidebar() {
+        sidebar?.classList.remove('is-open');
+        overlay?.classList.remove('is-visible');
+        document.body.style.overflow = '';
+      }
+
+      function openSidebar() {
+        sidebar?.classList.add('is-open');
+        overlay?.classList.add('is-visible');
+        document.body.style.overflow = 'hidden';
+      }
+
+      toggle?.addEventListener('click', () => {
+        if (sidebar?.classList.contains('is-open')) {
+          closeSidebar();
+        } else {
+          openSidebar();
+        }
+      });
+
+      overlay?.addEventListener('click', closeSidebar);
+    </script>
+  </body>
+</html>
+
+<style>
+  .page-wrapper {
+    display: flex;
+    width: 100%;
+    max-width: var(--layout-max-width);
+    margin: 0 auto;
+    min-height: calc(100vh - var(--header-height));
+    padding-top: var(--header-height);
+  }
+
+  .main-content {
+    flex: 1;
+    min-width: 0;
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+    padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-2xl);
+    background-color: var(--color-surface);
+    border-left: 1px solid var(--color-border-light);
+    border-right: 1px solid var(--color-border-light);
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      padding: var(--spacing-md);
+      border: none;
+    }
+  }
+</style>

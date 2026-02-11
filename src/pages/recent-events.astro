@@ -1,0 +1,115 @@
+---
+/* vibepedia 最近の出来事ページ
+ * 各記事に登録されたイベントデータを時系列で一覧表示する。
+ */
+import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+const base = import.meta.env.BASE_URL;
+const allArticles = await getCollection('articles');
+
+/* 全イベントを記事情報付きで収集 */
+const allEvents: { date: string; text: string; articleTitle: string; articleSlug: string }[] = [];
+for (const article of allArticles) {
+  for (const event of article.data.events) {
+    allEvents.push({
+      date: event.date,
+      text: event.text,
+      articleTitle: article.data.title,
+      articleSlug: article.data.slug ?? article.id,
+    });
+  }
+}
+
+/* 日付順にソート */
+allEvents.sort((a, b) => a.date.localeCompare(b.date));
+---
+
+<Layout title="最近の出来事" description="Vibepedia に登録されたイベントの一覧">
+  <header class="page-header">
+    <h1 class="page-title">最近の出来事</h1>
+    <p class="page-description">各記事に関連する歴史的なイベントを一覧表示しています。</p>
+  </header>
+
+  {allEvents.length > 0 ? (
+    <ul class="event-list">
+      {allEvents.map((event) => (
+        <li class="event-item">
+          <span class="event-date">{event.date}</span>
+          <div class="event-body">
+            <p class="event-text">{event.text}</p>
+            <a href={`${base}articles/${encodeURIComponent(event.articleSlug)}`} class="event-source">
+              {event.articleTitle}
+            </a>
+          </div>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p class="empty-message">イベントは登録されていません。</p>
+  )}
+</Layout>
+
+<style>
+  .page-header {
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 2px solid var(--color-accent);
+  }
+
+  .page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .page-description {
+    color: var(--color-text-secondary);
+    font-size: 0.9375rem;
+  }
+
+  .event-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .event-item {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) 0;
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  .event-item:last-child {
+    border-bottom: none;
+  }
+
+  .event-date {
+    flex-shrink: 0;
+    width: 60px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-accent);
+    padding-top: 2px;
+  }
+
+  .event-body {
+    flex: 1;
+  }
+
+  .event-text {
+    margin-bottom: var(--spacing-xs);
+    line-height: 1.6;
+  }
+
+  .event-source {
+    font-size: 0.8125rem;
+    color: var(--color-link);
+  }
+
+  .empty-message {
+    color: var(--color-text-tertiary);
+    padding: var(--spacing-xl) 0;
+    text-align: center;
+  }
+</style>

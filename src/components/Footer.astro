@@ -1,0 +1,41 @@
+---
+/* vibepedia フッターコンポーネント
+ * サイト下部の著作権表示・免責事項を表示する。
+ */
+---
+
+<footer class="footer">
+  <div class="footer-inner">
+    <p class="footer-text">
+      Vibepedia のコンテンツはデモンストレーション用に作成されたものです。
+    </p>
+    <p class="footer-copyright">
+      &copy; 2026 Vibepedia. Powered by Astro.
+    </p>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--color-border-light);
+    background-color: var(--color-sidebar-bg);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    text-align: center;
+  }
+
+  .footer-inner {
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+  }
+
+  .footer-text {
+    font-size: 0.8125rem;
+    color: var(--color-text-tertiary);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .footer-copyright {
+    font-size: 0.75rem;
+    color: var(--color-text-tertiary);
+  }
+</style>

@@ -1,0 +1,302 @@
+---
+/* vibepedia メインページ
+ * 「選り抜き記事」「今日は何の日」「新しい記事」の3セクションを表示する。
+ */
+import Layout from '../layouts/Layout.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import { getCollection } from 'astro:content';
+
+const base = import.meta.env.BASE_URL;
+
+/* 全記事を取得 */
+const allArticles = await getCollection('articles');
+
+/* 選り抜き記事: featured フラグが true の記事 */
+const featuredArticles = allArticles.filter((a) => a.data.featured);
+
+/* 新しい記事: lastmod で降順ソート */
+const recentArticles = [...allArticles].sort(
+  (a, b) => b.data.lastmod.getTime() - a.data.lastmod.getTime()
+).slice(0, 10);
+
+/* 今日は何の日: 今日の日付に対応する記事を検索 */
+const today = new Date();
+const todayTitle = `${today.getMonth() + 1}月${today.getDate()}日`;
+
+const todayArticle = allArticles.find((article) => article.data.title === todayTitle);
+---
+
+<Layout
+  title="Vibepedia"
+  description="Vibepedia - 自由にアクセスできるフリー百科事典"
+>
+  <!-- ウェルカムバナー -->
+  <section class="welcome-banner">
+    <h1 class="welcome-title">Vibepedia へようこそ</h1>
+    <p class="welcome-subtitle">
+      誰でも閲覧できるフリー百科事典。現在 <strong>{allArticles.length}</strong> 本の記事が掲載されています。
+    </p>
+  </section>
+
+  <!-- 選り抜き記事 -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        選り抜き記事
+      </h2>
+    </div>
+    <div class="featured-grid">
+      {featuredArticles.map((article) => (
+        <ArticleCard
+          title={article.data.title}
+          description={article.data.description}
+          slug={article.data.slug ?? article.id}
+          image={article.data.image}
+          category={article.data.category}
+          featured={true}
+        />
+      ))}
+    </div>
+  </section>
+
+  <!-- 今日は何の日 -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        今日は何の日 - {today.getMonth() + 1}月{today.getDate()}日
+      </h2>
+    </div>
+    <div class="today-events">
+      {todayArticle ? (
+        <div class="day-article-link">
+          <p class="day-article-description">{todayArticle.data.description}</p>
+          <a href={`${base}articles/${encodeURIComponent(todayArticle.data.slug ?? todayArticle.id)}`} class="day-article-button">
+            「{todayTitle}」の記事を読む →
+          </a>
+        </div>
+      ) : (
+        <p class="no-events">本日「{todayTitle}」に関する記事はまだ作成されていません。</p>
+      )}
+    </div>
+  </section>
+
+  <!-- 新しい記事 -->
+  <section class="section">
+    <div class="section-header">
+      <h2 class="section-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        新しい記事
+      </h2>
+    </div>
+    <ul class="recent-list">
+      {recentArticles.map((article) => (
+        <li class="recent-item">
+          <a href={`${base}articles/${encodeURIComponent(article.data.slug ?? article.id)}`} class="recent-link">
+            <span class="recent-title">{article.data.title}</span>
+            <span class="recent-meta">
+              <span class="recent-category">{article.data.category}</span>
+              <time datetime={article.data.lastmod.toISOString()}>
+                {article.data.lastmod.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </time>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Layout>
+
+<style>
+  /* ウェルカムバナー */
+  .welcome-banner {
+    text-align: center;
+    padding: var(--spacing-2xl) var(--spacing-md);
+    border-bottom: 1px solid var(--color-border-light);
+    margin-bottom: var(--spacing-xl);
+  }
+
+  .welcome-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: var(--spacing-sm);
+    letter-spacing: -0.02em;
+  }
+
+  .welcome-subtitle {
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+  }
+
+  /* セクション共通 */
+  .section {
+    margin-bottom: var(--spacing-2xl);
+  }
+
+  .section-header {
+    border-bottom: 2px solid var(--color-accent);
+    padding-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .section-title svg {
+    color: var(--color-accent);
+    flex-shrink: 0;
+  }
+
+  /* 選り抜き記事グリッド */
+  .featured-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-lg);
+  }
+
+  /* 今日は何の日 */
+  .today-events {
+    background-color: var(--color-sidebar-bg);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+  }
+
+  .day-article-link {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .day-article-description {
+    color: var(--color-text);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .day-article-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--color-accent);
+    color: white;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    transition: background-color var(--transition-fast), transform var(--transition-fast);
+    align-self: flex-start;
+  }
+
+  .day-article-button:hover {
+    background-color: var(--color-link);
+    transform: translateX(2px);
+  }
+
+  .no-events {
+    color: var(--color-text-tertiary);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  /* 新しい記事リスト */
+  .recent-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .recent-item {
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  .recent-item:last-child {
+    border-bottom: none;
+  }
+
+  .recent-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-sm);
+    text-decoration: none;
+    color: var(--color-text);
+    transition: background-color var(--transition-fast);
+    border-radius: var(--radius-sm);
+  }
+
+  .recent-link:visited {
+    color: var(--color-text);
+  }
+
+  .recent-link:hover {
+    background-color: var(--color-sidebar-bg);
+    text-decoration: none;
+  }
+
+  .recent-title {
+    font-weight: 500;
+    color: var(--color-link);
+  }
+
+  .recent-link:hover .recent-title {
+    text-decoration: underline;
+  }
+
+  .recent-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    font-size: 0.8125rem;
+    color: var(--color-text-tertiary);
+    flex-shrink: 0;
+  }
+
+  .recent-category {
+    padding: 2px 8px;
+    background-color: var(--color-border-light);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 768px) {
+    .welcome-title {
+      font-size: 1.5rem;
+    }
+
+    .featured-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .recent-link {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--spacing-xs);
+    }
+
+    .recent-meta {
+      margin-top: var(--spacing-xs);
+    }
+  }
+</style>

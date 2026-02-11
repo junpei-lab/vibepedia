@@ -1,0 +1,137 @@
+---
+/* vibepedia 目次コンポーネント
+ * 記事内の h2/h3 見出しから自動生成される目次。
+ * Intersection Observer によりスクロール位置に応じたハイライトを行う。
+ */
+interface Props {
+  headings: { depth: number; slug: string; text: string }[];
+}
+
+const { headings } = Astro.props;
+/* h2 と h3 のみ表示対象 */
+const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+{tocHeadings.length > 0 && (
+  <div class="toc-section">
+    <h3 class="toc-title">目次</h3>
+    <nav class="toc-nav" aria-label="目次">
+      <ul class="toc-list">
+        {tocHeadings.map((heading) => (
+          <li class={`toc-item toc-depth-${heading.depth}`}>
+            <a href={`#${heading.slug}`} class="toc-link" data-heading-slug={heading.slug}>
+              {heading.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+)}
+
+<!-- スクロール追従ハイライト用スクリプト -->
+<script>
+  function initTocHighlight() {
+    const tocLinks = document.querySelectorAll<HTMLAnchorElement>('.toc-link');
+    if (tocLinks.length === 0) return;
+
+    const slugs = Array.from(tocLinks).map((link) => link.dataset.headingSlug!);
+    const headingElements = slugs
+      .map((slug) => document.getElementById(slug))
+      .filter(Boolean) as HTMLElement[];
+
+    if (headingElements.length === 0) return;
+
+    let activeSlug = '';
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const newSlug = entry.target.id;
+            if (newSlug !== activeSlug) {
+              activeSlug = newSlug;
+              tocLinks.forEach((link) => {
+                link.classList.toggle('is-active', link.dataset.headingSlug === newSlug);
+              });
+            }
+          }
+        }
+      },
+      {
+        rootMargin: `-${getComputedStyle(document.documentElement).getPropertyValue('--header-height').trim() || '56px'} 0px -70% 0px`,
+        threshold: 0,
+      }
+    );
+
+    headingElements.forEach((el) => observer.observe(el));
+  }
+
+  initTocHighlight();
+</script>
+
+<style>
+  .toc-section {
+    border-top: 1px solid var(--color-border-light);
+    padding-top: var(--spacing-md);
+  }
+
+  .toc-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-tertiary);
+    padding: 0 var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .toc-nav {
+    max-height: calc(100vh - 340px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+
+  .toc-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .toc-item {
+    margin-bottom: 1px;
+  }
+
+  .toc-depth-3 {
+    padding-left: var(--spacing-md);
+  }
+
+  .toc-link {
+    display: block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    border-left: 2px solid transparent;
+    transition: all var(--transition-fast);
+  }
+
+  .toc-link:visited {
+    color: var(--color-text-secondary);
+  }
+
+  .toc-link:hover {
+    color: var(--color-link);
+    background-color: var(--color-border-light);
+    text-decoration: none;
+  }
+
+  .toc-link.is-active {
+    color: var(--color-link);
+    background-color: var(--color-toc-highlight);
+    border-left-color: var(--color-link);
+    font-weight: 500;
+  }
+</style>
