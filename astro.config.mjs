@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import remarkWikiLink from 'remark-wiki-link';
 
 function normalizeBasePath(pathValue) {
   if (!pathValue || pathValue === '/') {
@@ -21,4 +22,18 @@ const base = normalizeBasePath(process.env.BASE_PATH ?? (isProjectPage ? repo : 
 export default defineConfig({
   site,
   base,
+  markdown: {
+    remarkPlugins: [
+      [
+        remarkWikiLink,
+        {
+          // [[記事名]] を既存ルーティング /articles/:slug に変換する
+          pageResolver: (name) => [name.trim()],
+          hrefTemplate: (permalink) => `${base}articles/${encodeURIComponent(permalink)}`,
+          // Obsidian互換の [[ページ名|表示名]] を使えるようにする
+          aliasDivider: '|',
+        },
+      ],
+    ],
+  },
 });

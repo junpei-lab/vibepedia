@@ -1,0 +1,157 @@
+---
+/* vibepedia カテゴリページ
+ * 指定カテゴリの記事を最終更新日順に一覧表示する。
+ */
+import { getCollection, type CollectionEntry } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+import { buildCategorySummariesFromArticles } from '../../utils/categories';
+
+interface Props {
+  category: string;
+  articles: CollectionEntry<'articles'>[];
+}
+
+export async function getStaticPaths() {
+  const allArticles = await getCollection('articles');
+  const categories = buildCategorySummariesFromArticles(allArticles);
+
+  return categories.map((category) => {
+    const articles = allArticles
+      .filter((article) => article.data.category.trim() === category.name)
+      .sort((a, b) => b.data.lastmod.getTime() - a.data.lastmod.getTime());
+
+    return {
+      params: { slug: category.slug },
+      props: {
+        category: category.name,
+        articles,
+      },
+    };
+  });
+}
+
+const { category, articles } = Astro.props as Props;
+const base = import.meta.env.BASE_URL;
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+---
+
+<Layout title={`カテゴリ: ${category}`} description={`カテゴリ「${category}」の記事一覧`}>
+  <header class="page-header">
+    <h1 class="page-title">カテゴリ: {category}</h1>
+    <p class="page-description">このカテゴリに属する {articles.length} 件の記事を表示しています。</p>
+  </header>
+
+  <ul class="article-list">
+    {articles.map((article) => (
+      <li class="article-item">
+        <a href={`${base}articles/${encodeURIComponent(article.data.slug ?? article.id)}`} class="article-link">
+          <div class="article-info">
+            <h2 class="article-title">{article.data.title}</h2>
+            <p class="article-description">{article.data.description}</p>
+          </div>
+          <time class="article-date" datetime={article.data.lastmod.toISOString()}>
+            {formatDate(article.data.lastmod)}
+          </time>
+        </a>
+      </li>
+    ))}
+  </ul>
+</Layout>
+
+<style>
+  .page-header {
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 2px solid var(--color-accent);
+  }
+
+  .page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .page-description {
+    color: var(--color-text-secondary);
+    font-size: 0.9375rem;
+  }
+
+  .article-list {
+    list-style: none;
+    padding: 0;
+  }
+
+  .article-item {
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  .article-item:last-child {
+    border-bottom: none;
+  }
+
+  .article-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    color: var(--color-text);
+    transition: background-color var(--transition-fast);
+  }
+
+  .article-link:visited {
+    color: var(--color-text);
+  }
+
+  .article-link:hover {
+    background-color: var(--color-sidebar-bg);
+    text-decoration: none;
+  }
+
+  .article-info {
+    min-width: 0;
+  }
+
+  .article-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-link);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .article-link:hover .article-title {
+    text-decoration: underline;
+  }
+
+  .article-description {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .article-date {
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--color-text-tertiary);
+  }
+
+  @media (max-width: 768px) {
+    .article-link {
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+  }
+</style>

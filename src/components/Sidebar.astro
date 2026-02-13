@@ -4,6 +4,8 @@
  * デスクトップでは左側固定、モバイルではドロワーメニュー。
  */
 import TableOfContents from './TableOfContents.astro';
+import { getCollection } from 'astro:content';
+import { buildCategorySummariesFromArticles } from '../utils/categories';
 
 interface Props {
   headings?: { depth: number; slug: string; text: string }[];
@@ -12,6 +14,9 @@ interface Props {
 
 const { headings = [], isArticle = false } = Astro.props;
 const base = import.meta.env.BASE_URL;
+const categories = isArticle
+  ? []
+  : buildCategorySummariesFromArticles(await getCollection('articles'));
 ---
 
 <!-- モバイル用オーバーレイ -->
@@ -65,6 +70,26 @@ const base = import.meta.env.BASE_URL;
         </li>
       </ul>
     </div>
+
+    {!isArticle && categories.length > 0 && (
+      <div class="nav-section">
+        <h3 class="nav-section-title">カテゴリ</h3>
+        <ul class="nav-list">
+          {categories.map((category) => (
+            <li>
+              <a href={`${base}categories/${category.slug}`} class="nav-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20.59 13.41L11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82z"></path>
+                  <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                </svg>
+                <span>{category.name}</span>
+                <span class="category-count">{category.count}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
   </nav>
 
   {/* 記事ページでのみ目次を表示 */}
@@ -155,6 +180,12 @@ const base = import.meta.env.BASE_URL;
 
   .nav-link svg {
     flex-shrink: 0;
+    color: var(--color-text-tertiary);
+  }
+
+  .category-count {
+    margin-left: auto;
+    font-size: 0.75rem;
     color: var(--color-text-tertiary);
   }
 
