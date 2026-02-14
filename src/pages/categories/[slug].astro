@@ -1,36 +1,54 @@
 ---
 /* vibepedia カテゴリページ
- * 指定カテゴリの記事を最終更新日順に一覧表示する。
+ * 指定カテゴリの子カテゴリと直下記事を表示する。
  */
 import { getCollection, type CollectionEntry } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
-import { buildCategorySummariesFromArticles } from '../../utils/categories';
+import {
+  buildCategoryHierarchy,
+  type CategoryNode,
+} from '../../utils/categories';
 
 interface Props {
-  category: string;
+  category: CategoryNode;
+  parentCategory?: CategoryNode;
+  childCategories: { category: CategoryNode; count: number }[];
   articles: CollectionEntry<'articles'>[];
 }
 
 export async function getStaticPaths() {
-  const allArticles = await getCollection('articles');
-  const categories = buildCategorySummariesFromArticles(allArticles);
+  const [allCategories, allArticles] = await Promise.all([
+    getCollection('categories'),
+    getCollection('articles'),
+  ]);
+  const hierarchy = buildCategoryHierarchy(allCategories, allArticles);
+  const categories = [...hierarchy.byName.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, 'ja')
+  );
 
   return categories.map((category) => {
-    const articles = allArticles
-      .filter((article) => article.data.category.trim() === category.name)
-      .sort((a, b) => b.data.lastmod.getTime() - a.data.lastmod.getTime());
+    const parentCategory = category.parentName
+      ? hierarchy.byName.get(category.parentName)
+      : undefined;
+    const childCategories = (hierarchy.children.get(category.name) ?? []).map((childCategory) => ({
+      category: childCategory,
+      count: hierarchy.directArticleCount.get(childCategory.name) ?? 0,
+    }));
+    const articles = hierarchy.directArticlesByCategory.get(category.name) ?? [];
 
     return {
       params: { slug: category.slug },
       props: {
-        category: category.name,
+        category,
+        parentCategory,
+        childCategories,
         articles,
       },
     };
   });
 }
 
-const { category, articles } = Astro.props as Props;
+const { category, parentCategory, childCategories, articles } = Astro.props as Props;
 const base = import.meta.env.BASE_URL;
 
 const formatDate = (date: Date) =>
@@ -41,27 +59,66 @@ const formatDate = (date: Date) =>
   });
 ---
 
-<Layout title={`カテゴリ: ${category}`} description={`カテゴリ「${category}」の記事一覧`}>
+<Layout
+  title={`カテゴリ: ${category.name}`}
+  description={`カテゴリ「${category.name}」の直下記事一覧`}
+>
   <header class="page-header">
-    <h1 class="page-title">カテゴリ: {category}</h1>
-    <p class="page-description">このカテゴリに属する {articles.length} 件の記事を表示しています。</p>
+    <h1 class="page-title">カテゴリ: {category.name}</h1>
+    {parentCategory && (
+      <p class="page-parent">
+        親カテゴリ:
+        <a href={`${base}categories/${encodeURIComponent(parentCategory.slug)}`} class="parent-link">
+          {parentCategory.name}
+        </a>
+      </p>
+    )}
+    <p class="page-description">このカテゴリの直下記事 {articles.length} 件を表示しています。</p>
   </header>
 
-  <ul class="article-list">
-    {articles.map((article) => (
-      <li class="article-item">
-        <a href={`${base}articles/${encodeURIComponent(article.data.slug ?? article.id)}`} class="article-link">
-          <div class="article-info">
-            <h2 class="article-title">{article.data.title}</h2>
-            <p class="article-description">{article.data.description}</p>
-          </div>
-          <time class="article-date" datetime={article.data.lastmod.toISOString()}>
-            {formatDate(article.data.lastmod)}
-          </time>
-        </a>
-      </li>
-    ))}
-  </ul>
+  <section class="child-categories-section">
+    <h2 class="section-title">子カテゴリ</h2>
+    {childCategories.length > 0 ? (
+      <ul class="child-category-list">
+        {childCategories.map((child) => (
+          <li class="child-category-item">
+            <a
+              href={`${base}categories/${encodeURIComponent(child.category.slug)}`}
+              class="child-category-link"
+            >
+              <span>{child.category.name}</span>
+              <span class="child-category-count">{child.count}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="empty-state">このカテゴリに子カテゴリはありません。</p>
+    )}
+  </section>
+
+  <section class="articles-section">
+    <h2 class="section-title">記事一覧</h2>
+    {articles.length > 0 ? (
+      <ul class="article-list">
+        {articles.map((article) => (
+          <li class="article-item">
+            <a href={`${base}articles/${encodeURIComponent(article.data.slug ?? article.id)}`} class="article-link">
+              <div class="article-info">
+                <h3 class="article-title">{article.data.title}</h3>
+                <p class="article-description">{article.data.description}</p>
+              </div>
+              <time class="article-date" datetime={article.data.lastmod.toISOString()}>
+                {formatDate(article.data.lastmod)}
+              </time>
+            </a>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p class="empty-state">このカテゴリの直下記事はまだありません。</p>
+    )}
+  </section>
 </Layout>
 
 <style>
@@ -82,9 +139,75 @@ const formatDate = (date: Date) =>
     font-size: 0.9375rem;
   }
 
+  .page-parent {
+    margin-bottom: var(--spacing-xs);
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+  }
+
+  .parent-link {
+    margin-left: var(--spacing-xs);
+    color: var(--color-link);
+    text-decoration: none;
+  }
+
+  .parent-link:visited {
+    color: var(--color-link);
+  }
+
+  .parent-link:hover {
+    text-decoration: underline;
+  }
+
+  .articles-section,
+  .child-categories-section {
+    margin-bottom: var(--spacing-xl);
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .child-category-list,
   .article-list {
     list-style: none;
     padding: 0;
+  }
+
+  .child-category-list {
+    display: grid;
+    gap: var(--spacing-xs);
+  }
+
+  .child-category-link {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background-color: var(--color-sidebar-bg);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    color: var(--color-text);
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .child-category-link:visited {
+    color: var(--color-text);
+  }
+
+  .child-category-link:hover {
+    background-color: white;
+    border-color: var(--color-border);
+    text-decoration: none;
+  }
+
+  .child-category-count {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--color-text-tertiary);
   }
 
   .article-item {
@@ -145,6 +268,12 @@ const formatDate = (date: Date) =>
     flex-shrink: 0;
     white-space: nowrap;
     font-size: 0.75rem;
+    color: var(--color-text-tertiary);
+  }
+
+  .empty-state {
+    margin: 0;
+    font-size: 0.9rem;
     color: var(--color-text-tertiary);
   }
 

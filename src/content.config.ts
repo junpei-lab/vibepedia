@@ -28,4 +28,14 @@ const articles = defineCollection({
   }),
 });
 
-export const collections = { articles };
+// カテゴリコレクション: src/content/categories/ 配下のMarkdownファイルを管理
+const categories = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/categories' }),
+  schema: z.object({
+    name: z.string(),
+    parent: z.string().optional(),
+    description: z.string().optional(),
+  }),
+});
+
+export const collections = { articles, categories };

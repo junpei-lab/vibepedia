@@ -5,18 +5,46 @@
  */
 import TableOfContents from './TableOfContents.astro';
 import { getCollection } from 'astro:content';
-import { buildCategorySummariesFromArticles } from '../utils/categories';
+import {
+  buildCategoryHierarchy,
+  type CategoryNode,
+} from '../utils/categories';
 
 interface Props {
   headings?: { depth: number; slug: string; text: string }[];
   isArticle?: boolean;
 }
 
+interface CategoryTreeItem {
+  category: CategoryNode;
+  depth: number;
+}
+
 const { headings = [], isArticle = false } = Astro.props;
 const base = import.meta.env.BASE_URL;
-const categories = isArticle
-  ? []
-  : buildCategorySummariesFromArticles(await getCollection('articles'));
+let categoryTree: CategoryTreeItem[] = [];
+let directArticleCount = new Map<string, number>();
+
+if (!isArticle) {
+  const [allCategories, allArticles] = await Promise.all([
+    getCollection('categories'),
+    getCollection('articles'),
+  ]);
+  const hierarchy = buildCategoryHierarchy(allCategories, allArticles);
+
+  const walkTree = (categories: CategoryNode[], depth: number): void => {
+    for (const category of categories) {
+      categoryTree.push({ category, depth });
+      const childCategories = hierarchy.children.get(category.name) ?? [];
+      if (childCategories.length > 0) {
+        walkTree(childCategories, depth + 1);
+      }
+    }
+  };
+
+  walkTree(hierarchy.roots, 0);
+  directArticleCount = hierarchy.directArticleCount;
+}
 ---
 
 <!-- モバイル用オーバーレイ -->
@@ -71,19 +99,23 @@ const categories = isArticle
       </ul>
     </div>
 
-    {!isArticle && categories.length > 0 && (
+    {!isArticle && categoryTree.length > 0 && (
       <div class="nav-section">
         <h3 class="nav-section-title">カテゴリ</h3>
-        <ul class="nav-list">
-          {categories.map((category) => (
+        <ul class="nav-list category-list">
+          {categoryTree.map((item) => (
             <li>
-              <a href={`${base}categories/${category.slug}`} class="nav-link">
+              <a
+                href={`${base}categories/${encodeURIComponent(item.category.slug)}`}
+                class:list={['nav-link', 'category-link', { 'is-child': item.depth > 0 }]}
+                style={`--tree-depth: ${item.depth};`}
+              >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M20.59 13.41L11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82z"></path>
                   <line x1="7" y1="7" x2="7.01" y2="7"></line>
                 </svg>
-                <span>{category.name}</span>
-                <span class="category-count">{category.count}</span>
+                <span>{item.category.name}</span>
+                <span class="category-count">{directArticleCount.get(item.category.name) ?? 0}</span>
               </a>
             </li>
           ))}
@@ -181,6 +213,20 @@ const categories = isArticle
   .nav-link svg {
     flex-shrink: 0;
     color: var(--color-text-tertiary);
+  }
+
+  .category-list {
+    display: grid;
+    gap: 2px;
+  }
+
+  .category-link {
+    --tree-depth: 0;
+    padding-left: calc(var(--spacing-sm) + (var(--tree-depth) * 1rem));
+  }
+
+  .category-link.is-child {
+    font-size: 0.8125rem;
   }
 
   .category-count {
