@@ -17,6 +17,56 @@ export interface CategoryHierarchy {
   directArticlesByCategory: Map<string, CollectionEntry<'articles'>[]>;
 }
 
+export const getCategoryAncestors = (
+  category: CategoryNode,
+  byName: Map<string, CategoryNode>
+): CategoryNode[] => {
+  const ancestors: CategoryNode[] = [];
+  const visited = new Set<string>([category.name]);
+  let currentCategory: CategoryNode | undefined = category;
+
+  while (currentCategory?.parentName) {
+    const parentCategory = byName.get(currentCategory.parentName);
+    if (!parentCategory || visited.has(parentCategory.name)) {
+      break;
+    }
+    ancestors.unshift(parentCategory);
+    visited.add(parentCategory.name);
+    currentCategory = parentCategory;
+  }
+
+  return ancestors;
+};
+
+export const countDescendantCategories = (
+  categoryName: string,
+  children: Map<string, CategoryNode[]>
+): number => {
+  const childCategories = children.get(categoryName) ?? [];
+  let total = childCategories.length;
+
+  for (const childCategory of childCategories) {
+    total += countDescendantCategories(childCategory.name, children);
+  }
+
+  return total;
+};
+
+export const countSubtreeArticles = (
+  categoryName: string,
+  children: Map<string, CategoryNode[]>,
+  directArticleCount: Map<string, number>
+): number => {
+  const childCategories = children.get(categoryName) ?? [];
+  let total = directArticleCount.get(categoryName) ?? 0;
+
+  for (const childCategory of childCategories) {
+    total += countSubtreeArticles(childCategory.name, children, directArticleCount);
+  }
+
+  return total;
+};
+
 const sortByName = <T extends { name: string }>(items: T[]): T[] =>
   [...items].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 

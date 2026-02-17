@@ -4,19 +4,46 @@
  * slug（日本語タイトル）をURLパスとして使用する。
  */
 import Layout from '../../layouts/Layout.astro';
-import { getCollection, render } from 'astro:content';
+import { getCollection, render, type CollectionEntry } from 'astro:content';
+import {
+  buildCategoryHierarchy,
+  getCategoryAncestors,
+  type CategoryNode,
+} from '../../utils/categories';
 
-export async function getStaticPaths() {
-  const articles = await getCollection('articles');
-  return articles.map((article) => ({
-    params: { slug: article.data.slug ?? article.id },
-    props: { article },
-  }));
+interface Props {
+  article: CollectionEntry<'articles'>;
+  categoryTrail: CategoryNode[];
 }
 
-const { article } = Astro.props;
+export async function getStaticPaths() {
+  const [articles, categories] = await Promise.all([
+    getCollection('articles'),
+    getCollection('categories'),
+  ]);
+  const hierarchy = buildCategoryHierarchy(categories, articles);
+
+  return articles.map((article) => {
+    const category = hierarchy.byName.get(article.data.category.trim());
+
+    if (!category) {
+      throw new Error(`[categories] Article "${article.id}" has unknown category "${article.data.category}".`);
+    }
+
+    return {
+      params: { slug: article.data.slug ?? article.id },
+      props: {
+        article,
+        categoryTrail: [...getCategoryAncestors(category, hierarchy.byName), category],
+      },
+    };
+  });
+}
+
+const { article, categoryTrail } = Astro.props as Props;
 const { Content, headings } = await render(article);
 const base = import.meta.env.BASE_URL;
+const currentCategory = categoryTrail[categoryTrail.length - 1];
 
 /* 日付フォーマット */
 const formatDate = (date: Date) =>
@@ -37,7 +64,14 @@ const formatDate = (date: Date) =>
   <article class="article">
     <!-- 記事ヘッダー -->
     <header class="article-header">
-      <div class="article-category-badge">{article.data.category}</div>
+      {currentCategory && (
+        <a
+          href={`${base}categories/${encodeURIComponent(currentCategory.slug)}`}
+          class="article-category-badge"
+        >
+          {currentCategory.name}
+        </a>
+      )}
       <h1 class="article-title">{article.data.title}</h1>
       <p class="article-description">{article.data.description}</p>
       <div class="article-meta">
@@ -79,6 +113,25 @@ const formatDate = (date: Date) =>
 
     <!-- 記事フッター -->
     <footer class="article-footer">
+      <div class="article-category-links" aria-label="カテゴリリンク">
+        <span class="article-category-links-label">カテゴリ:</span>
+        {categoryTrail.map((trailCategory, index) => (
+          <>
+            {index > 0 && <span class="article-category-links-divider">|</span>}
+            <a
+              href={`${base}categories/${encodeURIComponent(trailCategory.slug)}`}
+              class:list={[
+                'article-category-link',
+                { 'is-current': trailCategory.name === currentCategory?.name },
+              ]}
+              aria-current={trailCategory.name === currentCategory?.name ? 'page' : undefined}
+            >
+              {trailCategory.name}
+            </a>
+          </>
+        ))}
+      </div>
+
       <a href={base} class="back-link">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="19" y1="12" x2="5" y2="12"></line>
@@ -111,6 +164,15 @@ const formatDate = (date: Date) =>
     background-color: #e8f4fd;
     border-radius: 12px;
     margin-bottom: var(--spacing-sm);
+    text-decoration: none;
+  }
+
+  .article-category-badge:visited {
+    color: var(--color-accent);
+  }
+
+  .article-category-badge:hover {
+    text-decoration: underline;
   }
 
   .article-title {
@@ -166,6 +228,46 @@ const formatDate = (date: Date) =>
     margin-top: var(--spacing-2xl);
     padding-top: var(--spacing-lg);
     border-top: 1px solid var(--color-border-light);
+    display: grid;
+    gap: var(--spacing-md);
+  }
+
+  .article-category-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    background-color: var(--color-sidebar-bg);
+    font-size: 0.875rem;
+  }
+
+  .article-category-links-label {
+    color: var(--color-text-secondary);
+  }
+
+  .article-category-links-divider {
+    color: var(--color-text-tertiary);
+  }
+
+  .article-category-link {
+    color: var(--color-link);
+    text-decoration: none;
+  }
+
+  .article-category-link:visited {
+    color: var(--color-link-visited);
+  }
+
+  .article-category-link:hover {
+    text-decoration: underline;
+  }
+
+  .article-category-link.is-current {
+    color: var(--color-text);
+    font-weight: 600;
+    pointer-events: none;
   }
 
   .back-link {
